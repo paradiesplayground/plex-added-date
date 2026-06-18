@@ -3,6 +3,9 @@ actions.log
 logs/
 *.backup-*
 
+# Local secrets
+.env
+
 # Temp / scratch
 tmp/
 

@@ -80,7 +80,8 @@ h1 {
 }
 
 .editor,
-.results {
+.results,
+.manual-ids {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -212,6 +213,11 @@ button:disabled {
 .results {
   margin-top: 18px;
   overflow: hidden;
+}
+
+.manual-ids {
+  margin-top: 18px;
+  padding: 18px;
 }
 
 .results-head {

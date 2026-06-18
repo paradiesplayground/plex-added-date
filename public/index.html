@@ -56,11 +56,6 @@
             <span>Stop Plex before applying and restart after</span>
           </label>
 
-          <label class="field full ids">
-            <span>Selected or manual Plex metadata IDs</span>
-            <textarea id="ids" name="ids" spellcheck="false" placeholder="12345&#10;12346&#10;12347, 2024-12-25 09:30"></textarea>
-          </label>
-
           <div class="actions">
             <button class="secondary" id="previewBtn" type="button">Preview</button>
             <button class="primary" id="applyBtn" type="submit" disabled>Apply updates</button>
@@ -97,6 +92,13 @@
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section class="manual-ids">
+          <label class="field full ids">
+            <span>Selected or manual Plex metadata IDs</span>
+            <textarea id="ids" name="ids" spellcheck="false" placeholder="12345&#10;12346&#10;12347, 2024-12-25 09:30"></textarea>
+          </label>
         </section>
       </section>
     </main>

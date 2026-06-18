@@ -1,4 +1,5 @@
 const http = require("node:http");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -23,6 +24,18 @@ const PLEX_CONFIG_PATH_HOST = process.env.PLEX_CONFIG_PATH_HOST || "/mnt/user/ap
 const PLEX_DB_RELATIVE_PATH = process.env.PLEX_DB_RELATIVE_PATH || "Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db";
 const BACKUP_DIR = process.env.BACKUP_DIR || "/backups";
 const LOG_FILE = process.env.LOG_FILE || "/logs/actions.log";
+const AUTH_USERNAME = process.env.AUTH_USERNAME || "";
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD || "";
+
+if (!AUTH_USERNAME || !AUTH_PASSWORD) {
+  console.error("AUTH_USERNAME and AUTH_PASSWORD must be set.");
+  process.exit(1);
+}
+
+if (AUTH_PASSWORD === "change-this-password") {
+  console.error("AUTH_PASSWORD must be changed from the .env.example placeholder.");
+  process.exit(1);
+}
 
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload, null, 2);
@@ -36,6 +49,46 @@ function sendJson(res, status, payload) {
 function sendText(res, status, message) {
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
   res.end(message);
+}
+
+function unauthorized(res) {
+  res.writeHead(401, {
+    "content-type": "text/plain; charset=utf-8",
+    "www-authenticate": 'Basic realm="Plex Added Date", charset="UTF-8"',
+  });
+  res.end("Authentication required");
+}
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isAuthenticated(req) {
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Basic ")) {
+    return false;
+  }
+
+  let decoded = "";
+  try {
+    decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+  } catch {
+    return false;
+  }
+
+  const separator = decoded.indexOf(":");
+  if (separator === -1) {
+    return false;
+  }
+
+  const username = decoded.slice(0, separator);
+  const password = decoded.slice(separator + 1);
+  return safeEqual(username, AUTH_USERNAME) && safeEqual(password, AUTH_PASSWORD);
 }
 
 function readBody(req) {
@@ -532,6 +585,11 @@ function serveStatic(req, res, pathname) {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  if (!isAuthenticated(req)) {
+    unauthorized(res);
+    return;
+  }
 
   if (req.method === "POST" && url.pathname.startsWith("/api/")) {
     handleApi(req, res, url.pathname);

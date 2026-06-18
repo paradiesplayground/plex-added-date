@@ -12,6 +12,8 @@ services:
       PLEX_DB_RELATIVE_PATH: Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db
       BACKUP_DIR: /backups
       LOG_FILE: /logs/actions.log
+      AUTH_USERNAME: ${AUTH_USERNAME:?Set AUTH_USERNAME in .env}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
     volumes:
       - "/mnt/user/appdata/binhex-plexpass/Plex Media Server/Plug-in Support/Databases:/plex-db"
       - "/mnt/user/backups/plex-db-backups:/backups"

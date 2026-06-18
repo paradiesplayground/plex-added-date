@@ -27,6 +27,7 @@ Dockerfile
 docker-compose.yml
 server.js
 .dockerignore
+.env.example
 public/
 ```
 
@@ -36,8 +37,19 @@ From the Unraid terminal:
 
 ```bash
 cd "/mnt/user/appdata/plex-added-date"
+cp .env.example .env
+nano .env
 docker compose up -d --build
 ```
+
+Set a real username and password in `.env` before starting the container:
+
+```text
+AUTH_USERNAME=your-username
+AUTH_PASSWORD=your-long-password
+```
+
+The container will refuse to start if `AUTH_PASSWORD` is left as `change-this-password`.
 
 Open the app:
 
@@ -57,6 +69,12 @@ docker compose up -d --build
 ```
 
 Then hard refresh the browser page with `Ctrl+F5`.
+
+If authentication settings changed, update `.env` and rebuild:
+
+```bash
+docker compose up -d --build
+```
 
 ## How It Works
 
@@ -89,15 +107,16 @@ docker run --rm -i \
 ## Using The App
 
 1. Open `http://tower:3737`.
-2. Choose **Movies**, **TV shows**, or **TV episodes**.
-3. Click **Load recent**.
-4. Select the items to backdate.
-5. Confirm the new added-at date. It defaults to today minus 6 months.
-6. Leave **Create a database backup before applying** checked.
-7. Leave **Stop Plex before applying and restart after** checked unless you already stopped Plex yourself.
-8. Click **Apply updates**.
+2. Sign in with the username and password from `.env`.
+3. Choose **Movies**, **TV shows**, or **TV episodes**.
+4. Click **Load recent**.
+5. Select the items to backdate.
+6. Confirm the new added-at date. It defaults to today minus 6 months.
+7. Leave **Create a database backup before applying** checked.
+8. Leave **Stop Plex before applying and restart after** checked unless you already stopped Plex yourself.
+9. Click **Apply updates**.
 
-The manual ID box remains available as a fallback. You can paste IDs one per line, and each line can optionally override the date:
+The manual ID box is at the bottom of the page as a fallback. You can paste IDs one per line, and each line can optionally override the date:
 
 ```text
 12345
@@ -120,6 +139,19 @@ Action logs are appended as JSON lines:
 ```
 
 Each log entry includes the timestamp, backup path, Plex stop/restart status, updated IDs, titles, old added date, and new added date.
+
+## Authentication
+
+The app uses HTTP Basic Auth. Credentials are required through environment variables:
+
+```text
+AUTH_USERNAME
+AUTH_PASSWORD
+```
+
+The included `docker-compose.yml` reads them from `.env`. Do not commit `.env`; it is ignored by Git and Docker builds.
+
+Basic Auth protects the app from casual LAN access, but it is not a reason to expose this service to the internet. Keep it on a trusted local network.
 
 ## Media Types
 
