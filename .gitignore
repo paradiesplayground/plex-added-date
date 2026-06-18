@@ -1,0 +1,11 @@
+# Runtime logs and backups
+actions.log
+logs/
+*.backup-*
+
+# Temp / scratch
+tmp/
+
+# OS
+.DS_Store
+Thumbs.db

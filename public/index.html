@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Plex Added Date</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <h1>Plex Added Date</h1>
+            <p>Preview and update Plex metadata added-at dates by ID.</p>
+          </div>
+          <div class="status" id="status">Ready</div>
+        </header>
+
+        <form id="form" class="editor">
+          <label class="field full">
+            <span>Plex database path</span>
+            <input id="dbPath" name="dbPath" type="text" spellcheck="false" placeholder="C:\Path\To\com.plexapp.plugins.library.db">
+          </label>
+
+          <label class="field">
+            <span>Recent window</span>
+            <input id="recentDays" name="recentDays" type="number" min="1" max="3650" value="7">
+          </label>
+
+          <div class="load-recent">
+            <button class="secondary" id="recentBtn" type="button">Load recent movies</button>
+          </div>
+
+          <label class="field">
+            <span>New added-at date</span>
+            <input id="defaultDate" name="defaultDate" type="datetime-local">
+          </label>
+
+          <label class="check">
+            <input id="backup" name="backup" type="checkbox" checked>
+            <span>Create a database backup before applying</span>
+          </label>
+
+          <label class="check">
+            <input id="managePlex" name="managePlex" type="checkbox" checked>
+            <span>Stop Plex before applying and restart after</span>
+          </label>
+
+          <label class="field full ids">
+            <span>Selected or manual Plex metadata IDs</span>
+            <textarea id="ids" name="ids" spellcheck="false" placeholder="12345&#10;12346&#10;12347, 2024-12-25 09:30"></textarea>
+          </label>
+
+          <div class="actions">
+            <button class="secondary" id="previewBtn" type="button">Preview</button>
+            <button class="primary" id="applyBtn" type="submit" disabled>Apply updates</button>
+          </div>
+        </form>
+
+        <section class="results">
+          <div class="results-head">
+            <h2>Movies</h2>
+            <div class="results-tools">
+              <button class="secondary small" id="selectAllBtn" type="button" disabled>Select all</button>
+              <button class="secondary small" id="clearSelectionBtn" type="button" disabled>Clear</button>
+              <span id="summary">No rows loaded</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="select-col">Use</th>
+                  <th>ID</th>
+                  <th>Status</th>
+                  <th>Title</th>
+                  <th>Library</th>
+                  <th>Current added</th>
+                  <th>New added</th>
+                </tr>
+              </thead>
+              <tbody id="rows">
+                <tr>
+                  <td colspan="7" class="empty">Run a preview before writing to the database.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

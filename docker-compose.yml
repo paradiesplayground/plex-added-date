@@ -1,0 +1,20 @@
+services:
+  plex-added-date:
+    build: .
+    container_name: plex-added-date
+    ports:
+      - "3737:3737"
+    environment:
+      PLEX_DB_PATH: /plex-db
+      PLEX_CONTAINER_NAME: binhex-plexpass
+      PLEX_SQLITE_IN_CONTAINER: /usr/lib/plexmediaserver/Plex SQLite
+      PLEX_CONFIG_PATH_HOST: /mnt/user/appdata/binhex-plexpass
+      PLEX_DB_RELATIVE_PATH: Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db
+      BACKUP_DIR: /backups
+      LOG_FILE: /logs/actions.log
+    volumes:
+      - "/mnt/user/appdata/binhex-plexpass/Plex Media Server/Plug-in Support/Databases:/plex-db"
+      - "/mnt/user/backups/plex-db-backups:/backups"
+      - "/mnt/user/appdata/plex-added-date/logs:/logs"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    restart: unless-stopped
