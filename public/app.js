@@ -1,5 +1,6 @@
 const form = document.querySelector("#form");
 const dbPath = document.querySelector("#dbPath");
+const mediaType = document.querySelector("#mediaType");
 const defaultDate = document.querySelector("#defaultDate");
 const recentDays = document.querySelector("#recentDays");
 const ids = document.querySelector("#ids");
@@ -13,9 +14,14 @@ const clearSelectionBtn = document.querySelector("#clearSelectionBtn");
 const statusEl = document.querySelector("#status");
 const rowsEl = document.querySelector("#rows");
 const summaryEl = document.querySelector("#summary");
+const resultsTitle = document.querySelector("#resultsTitle");
 
 let lastPreview = [];
 let selectedIds = new Set();
+let mediaLabels = {
+  movie: "movies",
+  show: "TV shows",
+};
 
 function setStatus(message, kind = "neutral") {
   statusEl.textContent = message;
@@ -53,11 +59,26 @@ function payload() {
   const selectedText = [...selectedIds].join("\n");
   return {
     dbPath: dbPath.value,
+    mediaType: mediaType.value,
     defaultDate: defaultDate.value,
     ids: selectedText || ids.value,
     backup: backup.checked,
     managePlex: managePlex.checked,
   };
+}
+
+function currentMediaLabel() {
+  return mediaLabels[mediaType.value] || "items";
+}
+
+function titleCaseLabel(label) {
+  return label.replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function updateMediaText() {
+  const label = currentMediaLabel();
+  resultsTitle.textContent = titleCaseLabel(label);
+  recentBtn.textContent = `Load recent ${label}`;
 }
 
 async function postJson(url, data) {
@@ -133,6 +154,10 @@ function updateSummary() {
 async function loadConfig() {
   try {
     const result = await postJson("/api/config", {});
+    if (Array.isArray(result.mediaTypes)) {
+      mediaLabels = Object.fromEntries(result.mediaTypes.map((item) => [item.value, item.label]));
+    }
+    updateMediaText();
     dbPath.value = result.defaultDbPath || "";
     if (dbPath.value) {
       await loadRecent();
@@ -145,17 +170,18 @@ async function loadConfig() {
 }
 
 async function loadRecent() {
-  setStatus("Loading recent movies...");
+  setStatus(`Loading recent ${currentMediaLabel()}...`);
   applyBtn.disabled = true;
   try {
     const result = await postJson("/api/recent", {
       dbPath: dbPath.value,
+      mediaType: mediaType.value,
       days: recentDays.value || 7,
     });
     dbPath.value = result.dbPath;
     selectedIds = new Set(result.rows.filter((row) => row.status === "found").map((row) => Number(row.id)));
     renderRows(result.rows, true);
-    setStatus("Recent movies loaded", "success");
+    setStatus(`Recent ${currentMediaLabel()} loaded`, "success");
   } catch (error) {
     renderRows([]);
     setStatus(error.message, "error");
@@ -177,6 +203,13 @@ async function preview() {
 
 previewBtn.addEventListener("click", preview);
 recentBtn.addEventListener("click", loadRecent);
+mediaType.addEventListener("change", () => {
+  selectedIds.clear();
+  syncSelectionText();
+  renderRows([]);
+  updateMediaText();
+  loadRecent();
+});
 selectAllBtn.addEventListener("click", () => {
   selectedIds = new Set(lastPreview.filter((row) => row.status === "found").map((row) => Number(row.id)));
   renderRows(lastPreview);

@@ -24,6 +24,14 @@
           </label>
 
           <label class="field">
+            <span>Media type</span>
+            <select id="mediaType" name="mediaType">
+              <option value="movie" selected>Movies</option>
+              <option value="show">TV shows</option>
+            </select>
+          </label>
+
+          <label class="field">
             <span>Recent window</span>
             <input id="recentDays" name="recentDays" type="number" min="1" max="3650" value="7">
           </label>
@@ -60,7 +68,7 @@
 
         <section class="results">
           <div class="results-head">
-            <h2>Movies</h2>
+            <h2 id="resultsTitle">Movies</h2>
             <div class="results-tools">
               <button class="secondary small" id="selectAllBtn" type="button" disabled>Select all</button>
               <button class="secondary small" id="clearSelectionBtn" type="button" disabled>Clear</button>

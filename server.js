@@ -9,7 +9,10 @@ const PORT = Number(process.env.PORT || 3737);
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const PLEX_DB_FILE = "com.plexapp.plugins.library.db";
-const MOVIE_METADATA_TYPE = 1;
+const MEDIA_TYPES = {
+  movie: { label: "movies", metadataType: 1 },
+  show: { label: "TV shows", metadataType: 2 },
+};
 const FIELD_SEPARATOR = "\x1f";
 
 const PLEX_DB_PATH = process.env.PLEX_DB_PATH || "/plex-db";
@@ -131,6 +134,14 @@ function parseIdRows(text, fallbackTimestamp) {
   }
 
   return rows;
+}
+
+function mediaTypeConfig(mediaType) {
+  const key = String(mediaType || "movie").toLowerCase();
+  if (!MEDIA_TYPES[key]) {
+    throw new Error(`Unsupported media type: ${mediaType}`);
+  }
+  return { key, ...MEDIA_TYPES[key] };
 }
 
 function sqlInt(value) {
@@ -269,7 +280,8 @@ function toPreviewRow(row, newAddedAt = row.addedAt) {
   };
 }
 
-function recentMovies(days = 7) {
+function recentItems(mediaType, days = 7) {
+  const media = mediaTypeConfig(mediaType);
   const numericDays = Number(days);
   if (!Number.isFinite(numericDays) || numericDays <= 0 || numericDays > 3650) {
     throw new Error("Recent-days value must be between 1 and 3650.");
@@ -278,7 +290,7 @@ function recentMovies(days = 7) {
   const cutoff = Math.floor(Date.now() / 1000) - Math.floor(numericDays * 86400);
   const lines = runPlexSqlite(
     rowSelectSql(
-      `WHERE metadata_type = ${sqlInt(MOVIE_METADATA_TYPE)} AND added_at >= ${sqlInt(cutoff)}`,
+      `WHERE metadata_type = ${sqlInt(media.metadataType)} AND added_at >= ${sqlInt(cutoff)}`,
       "ORDER BY added_at DESC, id DESC"
     )
   );
@@ -286,10 +298,11 @@ function recentMovies(days = 7) {
   return parsePlexRows(lines).map((row) => toPreviewRow(row));
 }
 
-function buildPreview(rows) {
+function buildPreview(mediaType, rows) {
+  const media = mediaTypeConfig(mediaType);
   const found = new Map();
   const idList = rows.map((row) => sqlInt(row.id)).join(",");
-  const lines = runPlexSqlite(rowSelectSql(`WHERE metadata_type = ${MOVIE_METADATA_TYPE} AND id IN (${idList})`));
+  const lines = runPlexSqlite(rowSelectSql(`WHERE metadata_type = ${sqlInt(media.metadataType)} AND id IN (${idList})`));
 
   for (const item of parsePlexRows(lines)) {
     found.set(item.id, item);
@@ -336,15 +349,17 @@ function appendActionLog(entry) {
   return LOG_FILE;
 }
 
-function applyDatabaseUpdates(rows) {
+function applyDatabaseUpdates(mediaType, rows) {
+  const media = mediaTypeConfig(mediaType);
   const updates = rows
-    .map((row) => `UPDATE metadata_items SET added_at = ${sqlInt(row.addedAt)} WHERE metadata_type = ${MOVIE_METADATA_TYPE} AND id = ${sqlInt(row.id)};`)
+    .map((row) => `UPDATE metadata_items SET added_at = ${sqlInt(row.addedAt)} WHERE metadata_type = ${sqlInt(media.metadataType)} AND id = ${sqlInt(row.id)};`)
     .join("\n");
 
   runPlexSqlite(`BEGIN IMMEDIATE;\n${updates}\nCOMMIT;`, true);
 }
 
-function applyUpdates(dbPath, rows, makeBackup, managePlex = false) {
+function applyUpdates(dbPath, mediaType, rows, makeBackup, managePlex = false) {
+  const media = mediaTypeConfig(mediaType);
   let plexWasStopped = false;
 
   try {
@@ -352,19 +367,21 @@ function applyUpdates(dbPath, rows, makeBackup, managePlex = false) {
       plexWasStopped = stopPlexContainerIfRunning().stopped;
     }
 
-    const preview = buildPreview(rows);
+    const preview = buildPreview(media.key, rows);
     const missing = preview.filter((row) => row.status === "missing");
     if (missing.length > 0) {
-      throw new Error(`Cannot update missing movie IDs: ${missing.map((row) => row.id).join(", ")}`);
+      throw new Error(`Cannot update missing ${media.label} IDs: ${missing.map((row) => row.id).join(", ")}`);
     }
 
     const backupPath = makeBackup ? createBackup(dbPath) : "";
-    applyDatabaseUpdates(rows);
+    applyDatabaseUpdates(media.key, rows);
 
     const result = {
       backupPath,
       plexStopped: plexWasStopped,
       plexRestarted: plexWasStopped,
+      mediaType: media.key,
+      mediaLabel: media.label,
       updated: rows.length,
       changes: preview.map((row) => ({
         id: row.id,
@@ -374,12 +391,14 @@ function applyUpdates(dbPath, rows, makeBackup, managePlex = false) {
         newAddedAt: row.newAddedAt,
         newAddedAtIso: row.newAddedAtIso,
       })),
-      rows: buildPreview(rows),
+      rows: buildPreview(media.key, rows),
     };
 
     const logPath = appendActionLog({
       action: "apply",
       status: "success",
+      mediaType: media.key,
+      mediaLabel: media.label,
       dbPath,
       backupPath,
       plexStopped: result.plexStopped,
@@ -393,6 +412,8 @@ function applyUpdates(dbPath, rows, makeBackup, managePlex = false) {
     const logPath = appendActionLog({
       action: "apply",
       status: "error",
+      mediaType: media.key,
+      mediaLabel: media.label,
       dbPath,
       plexStopped: plexWasStopped,
       plexRestarted: false,
@@ -410,9 +431,10 @@ function applyUpdates(dbPath, rows, makeBackup, managePlex = false) {
 
 function parsePayload(payload) {
   const dbPath = resolveDatabasePath(payload.dbPath || PLEX_DB_PATH);
+  const media = mediaTypeConfig(payload.mediaType);
   const defaultTimestamp = parseTimestamp(payload.defaultDate);
   const rows = parseIdRows(payload.ids, defaultTimestamp);
-  return { dbPath, rows };
+  return { dbPath, mediaType: media.key, rows };
 }
 
 async function handleApi(req, res, pathname) {
@@ -425,6 +447,10 @@ async function handleApi(req, res, pathname) {
         plexContainerName: PLEX_CONTAINER_NAME,
         backupDir: BACKUP_DIR,
         logFile: LOG_FILE,
+        mediaTypes: Object.entries(MEDIA_TYPES).map(([value, media]) => ({
+          value,
+          label: media.label,
+        })),
       });
       return;
     }
@@ -432,20 +458,20 @@ async function handleApi(req, res, pathname) {
     if (pathname === "/api/recent") {
       sendJson(res, 200, {
         dbPath: resolveDatabasePath(payload.dbPath || PLEX_DB_PATH),
-        rows: recentMovies(payload.days || 7),
+        rows: recentItems(payload.mediaType, payload.days || 7),
       });
       return;
     }
 
-    const { dbPath, rows } = parsePayload(payload);
+    const { dbPath, mediaType, rows } = parsePayload(payload);
 
     if (pathname === "/api/preview") {
-      sendJson(res, 200, { dbPath, rows: buildPreview(rows) });
+      sendJson(res, 200, { dbPath, rows: buildPreview(mediaType, rows) });
       return;
     }
 
     if (pathname === "/api/apply") {
-      sendJson(res, 200, applyUpdates(dbPath, rows, payload.backup !== false, payload.managePlex === true));
+      sendJson(res, 200, applyUpdates(dbPath, mediaType, rows, payload.backup !== false, payload.managePlex === true));
       return;
     }
 
