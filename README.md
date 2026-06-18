@@ -1,6 +1,6 @@
 # Plex Added Date
 
-A small Unraid/Docker web app for changing Plex movie and TV show `added_at` dates in the Plex database.
+A small Unraid/Docker web app for changing Plex movie, TV show, and TV episode `added_at` dates in the Plex database.
 
 The app is built for this setup:
 
@@ -89,7 +89,7 @@ docker run --rm -i \
 ## Using The App
 
 1. Open `http://tower:3737`.
-2. Choose **Movies** or **TV shows**.
+2. Choose **Movies**, **TV shows**, or **TV episodes**.
 3. Click **Load recent**.
 4. Select the items to backdate.
 5. Confirm the new added-at date. It defaults to today minus 6 months.
@@ -126,11 +126,14 @@ Each log entry includes the timestamp, backup path, Plex stop/restart status, up
 The selector maps to Plex `metadata_items.metadata_type` values:
 
 ```text
-Movies   -> 1
-TV shows -> 2
+Movies      -> 1
+TV shows    -> 2
+TV episodes -> 4
 ```
 
-Preview and apply both enforce the selected type, so a movie ID will not be updated while **TV shows** is selected, and vice versa.
+**TV shows** means the show-level Plex metadata record. **TV episodes** means individual episode records. For episodes, the table includes extra detail from the parent show/season when Plex has it, such as `Show Name - S01E03`.
+
+Preview and apply both enforce the selected type, so a movie ID will not be updated while **TV episodes** is selected, and vice versa.
 
 ## Customizing
 

@@ -12,6 +12,7 @@ const PLEX_DB_FILE = "com.plexapp.plugins.library.db";
 const MEDIA_TYPES = {
   movie: { label: "movies", metadataType: 1 },
   show: { label: "TV shows", metadataType: 2 },
+  episode: { label: "TV episodes", metadataType: 4 },
 };
 const FIELD_SEPARATOR = "\x1f";
 
@@ -157,14 +158,33 @@ function cleanSqlField(field) {
 }
 
 function rowSelectSql(whereClause, orderClause = "") {
+  const detailSql = `
+    CASE
+      WHEN item.metadata_type = 4 THEN
+        trim(
+          ifnull(show.title, '')
+          || CASE
+            WHEN season."index" IS NOT NULL AND item."index" IS NOT NULL
+              THEN ' - S' || printf('%02d', season."index") || 'E' || printf('%02d', item."index")
+            ELSE ''
+          END
+        )
+      WHEN item.year IS NOT NULL THEN CAST(item.year AS TEXT)
+      ELSE ''
+    END
+  `;
+
   return `
-    SELECT id
-      || char(31) || ${cleanSqlField("title")}
-      || char(31) || ifnull(metadata_type, '')
-      || char(31) || ${cleanSqlField("guid")}
-      || char(31) || ifnull(library_section_id, '')
-      || char(31) || ifnull(added_at, '')
-    FROM metadata_items
+    SELECT item.id
+      || char(31) || ${cleanSqlField("item.title")}
+      || char(31) || ifnull(item.metadata_type, '')
+      || char(31) || ${cleanSqlField("item.guid")}
+      || char(31) || ifnull(item.library_section_id, '')
+      || char(31) || ifnull(item.added_at, '')
+      || char(31) || ${cleanSqlField(detailSql)}
+    FROM metadata_items item
+    LEFT JOIN metadata_items season ON item.parent_id = season.id
+    LEFT JOIN metadata_items show ON season.parent_id = show.id
     ${whereClause}
     ${orderClause};
   `;
@@ -257,6 +277,7 @@ function parsePlexRows(lines) {
       guid: parts[3] || "",
       librarySectionId: parts[4] ? Number(parts[4]) : "",
       addedAt: parts[5] ? Number(parts[5]) : null,
+      detail: parts[6] || "",
     };
   });
 }
@@ -277,6 +298,7 @@ function toPreviewRow(row, newAddedAt = row.addedAt) {
     newAddedAt,
     newAddedAtIso: newAddedAt ? formatIso(newAddedAt) : "",
     guid: row.guid || "",
+    detail: row.detail || "",
   };
 }
 
@@ -290,8 +312,8 @@ function recentItems(mediaType, days = 7) {
   const cutoff = Math.floor(Date.now() / 1000) - Math.floor(numericDays * 86400);
   const lines = runPlexSqlite(
     rowSelectSql(
-      `WHERE metadata_type = ${sqlInt(media.metadataType)} AND added_at >= ${sqlInt(cutoff)}`,
-      "ORDER BY added_at DESC, id DESC"
+      `WHERE item.metadata_type = ${sqlInt(media.metadataType)} AND item.added_at >= ${sqlInt(cutoff)}`,
+      "ORDER BY item.added_at DESC, item.id DESC"
     )
   );
 
@@ -302,7 +324,7 @@ function buildPreview(mediaType, rows) {
   const media = mediaTypeConfig(mediaType);
   const found = new Map();
   const idList = rows.map((row) => sqlInt(row.id)).join(",");
-  const lines = runPlexSqlite(rowSelectSql(`WHERE metadata_type = ${sqlInt(media.metadataType)} AND id IN (${idList})`));
+  const lines = runPlexSqlite(rowSelectSql(`WHERE item.metadata_type = ${sqlInt(media.metadataType)} AND item.id IN (${idList})`));
 
   for (const item of parsePlexRows(lines)) {
     found.set(item.id, item);
@@ -322,6 +344,7 @@ function buildPreview(mediaType, rows) {
         newAddedAt: row.addedAt,
         newAddedAtIso: formatIso(row.addedAt),
         guid: "",
+        detail: "",
       };
     }
     return toPreviewRow(item, row.addedAt);
@@ -386,6 +409,7 @@ function applyUpdates(dbPath, mediaType, rows, makeBackup, managePlex = false) {
       changes: preview.map((row) => ({
         id: row.id,
         title: row.title,
+        detail: row.detail,
         oldAddedAt: row.currentAddedAt,
         oldAddedAtIso: row.currentAddedAtIso,
         newAddedAt: row.newAddedAt,

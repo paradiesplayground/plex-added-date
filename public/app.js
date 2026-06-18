@@ -21,6 +21,7 @@ let selectedIds = new Set();
 let mediaLabels = {
   movie: "movies",
   show: "TV shows",
+  episode: "TV episodes",
 };
 
 function setStatus(message, kind = "neutral") {
@@ -113,7 +114,7 @@ function renderRows(rows, autoSelect = false) {
     : "No rows loaded";
 
   if (!rows.length) {
-    rowsEl.innerHTML = `<tr><td colspan="7" class="empty">No rows matched.</td></tr>`;
+    rowsEl.innerHTML = `<tr><td colspan="8" class="empty">No rows matched.</td></tr>`;
     return;
   }
 
@@ -125,6 +126,7 @@ function renderRows(rows, autoSelect = false) {
       <td class="mono">${escapeHtml(row.id)}</td>
       <td><span class="pill ${escapeHtml(row.status)}">${escapeHtml(row.status)}</span></td>
       <td>${escapeHtml(row.title || "Unknown")}</td>
+      <td>${escapeHtml(row.detail || "")}</td>
       <td>${escapeHtml(row.librarySectionId || "")}</td>
       <td class="mono">${escapeHtml(formatDisplay(row.currentAddedAtIso))}</td>
       <td class="mono">${escapeHtml(formatDisplay(row.newAddedAtIso))}</td>
